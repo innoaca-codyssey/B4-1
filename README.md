@@ -220,3 +220,26 @@ LISTEN 0      128             [::]:20022         [::]:*    users:(("sshd",pid=72
 ```
 
 AGENT_KEY_PATH는 api_keys 디렉토리, 키 파일명은 secret.key로 실행했습니다. 제공 바이너리는 같은 경로로 부모와 자식 프로세스를 생성합니다. 리슨 소켓을 가진 자식 프로세스를 모니터링 대상으로 선택합니다.
+
+## 프로세스와 자원 모니터
+
+```bash
++ chown agent-dev:agent-core /home/agent-admin/agent-app/bin/monitor.sh
++ chmod 750 /home/agent-admin/agent-app/bin/monitor.sh
++ printf 'agent-admin ALL=(root) NOPASSWD: /usr/sbin/ufw status\n'
++ chmod 440 /etc/sudoers.d/agent-monitor
++ visudo -c
+/etc/sudoers: parsed OK
+/etc/sudoers.d/README: parsed OK
+/etc/sudoers.d/agent-monitor: parsed OK
++ ls -l /home/agent-admin/agent-app/bin/monitor.sh
+-rwxr-x--- 1 agent-dev agent-core 2252 Sep 30 12:56 /home/agent-admin/agent-app/bin/monitor.sh
++ sudo -u agent-admin bash -c 'source ~/agent.env; /home/agent-admin/agent-app/bin/monitor.sh'
+[OK] PID:320 PORT:15034
+CPU:2.0% MEM:3.1% RSS:246932KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
++ tail -n 3 /var/log/agent-app/monitor.log
+[2026-09-30 12:57:05] PID:320 CPU:2.0% MEM:3.1% DISK_USED:5%
+```
+
+pgrep -n으로 바이너리 자식 PID를 고르고 ss로 포트 상태를 따로 확인합니다. CPU는 /proc/PID/stat의 utime/stime 증가분을 1초 간격으로 계산하며 100%는 한 코어를 뜻합니다. 메모리는 RSS를 Linux VM의 MemTotal로 나눈 비율입니다. 컨테이너 메모리 제한 대비 비율과는 다릅니다. 디스크는 df의 루트 파일시스템 사용률입니다. agent-admin은 sudoers에서 ufw status만 실행할 수 있습니다.
