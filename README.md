@@ -243,3 +243,36 @@ CPU:2.0% MEM:3.1% RSS:246932KiB DISK_USED:5%
 ```
 
 pgrep -n으로 바이너리 자식 PID를 고르고 ss로 포트 상태를 따로 확인합니다. CPU는 /proc/PID/stat의 utime/stime 증가분을 1초 간격으로 계산하며 100%는 한 코어를 뜻합니다. 메모리는 RSS를 Linux VM의 MemTotal로 나눈 비율입니다. 컨테이너 메모리 제한 대비 비율과는 다릅니다. 디스크는 df의 루트 파일시스템 사용률입니다. agent-admin은 sudoers에서 ufw status만 실행할 수 있습니다.
+
+## 방화벽 연결 확인
+
+```bash
+nc -z -w 2 codyssey-b4 20022
+Connection to codyssey-b4 (172.27.0.2) 20022 port [tcp/*] succeeded!
+exit=0
+nc -z -w 2 codyssey-b4 15034
+Connection to codyssey-b4 (172.27.0.2) 15034 port [tcp/*] succeeded!
+exit=0
+nc -z -w 2 codyssey-b4 15035
+exit=1
+```
+
+별도 클라이언트 컨테이너에서 20022와 15034에 연결되고, 리스너를 실행한 15035는 연결되지 않았습니다. 호스트 포트 매핑 없이 전용 내부 네트워크에서 확인했습니다.
+
+## cron 등록
+
+```bash
++ printf '* * * * * /bin/bash -c '\''source /home/agent-admin/agent.env; /home/agent-admin/agent-app/bin/monitor.sh'\'' >> /var/log/agent-app/cron.log 2>&1\n'
++ crontab -u agent-admin -
++ service cron start
+ * Starting periodic command scheduler cron
+   ...done.
++ crontab -u agent-admin -l
+* * * * * /bin/bash -c 'source /home/agent-admin/agent.env; /home/agent-admin/agent-app/bin/monitor.sh' >> /var/log/agent-app/cron.log 2>&1
++ date -u
+Wed Sep 30 12:58:02 UTC 2026
++ wc -l /var/log/agent-app/monitor.log
+1 /var/log/agent-app/monitor.log
+```
+
+cron은 agent-admin으로 실행되며 비로그인 셸에서도 환경변수를 읽도록 agent.env를 명시적으로 source합니다. 로그는 >>로 이어 붙이며 >를 사용하면 이전 기록이 덮어써집니다.
