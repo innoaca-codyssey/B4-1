@@ -276,3 +276,25 @@ Wed Sep 30 12:58:02 UTC 2026
 ```
 
 cron은 agent-admin으로 실행되며 비로그인 셸에서도 환경변수를 읽도록 agent.env를 명시적으로 source합니다. 로그는 >>로 이어 붙이며 >를 사용하면 이전 기록이 덮어써집니다.
+
+## 실패와 경고 분리
+
+```bash
++ sudo -u agent-admin bash -c 'source ~/agent.env; AGENT_PORT=15036 "$AGENT_HOME/bin/monitor.sh"; echo "exit=$?"; AGENT_APP=/missing "$AGENT_HOME/bin/monitor.sh"; echo "exit=$?"'
+[ERROR] Port 15036 is not listening
+exit=1
+[ERROR] Process is not running: /missing
+exit=1
++ ufw disable
+Firewall stopped and disabled on system startup
++ sudo -u agent-admin bash -c 'source ~/agent.env; "$AGENT_HOME/bin/monitor.sh"; echo "exit=$?"'
+[OK] PID:320 PORT:15034
+[WARNING] Firewall is inactive or its status is unavailable
+CPU:20.0% MEM:1.8% RSS:144140KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+exit=0
++ ufw --force enable
+Firewall is active and enabled on system startup
+```
+
+프로세스나 리슨 포트가 없으면 자원 로그를 기록하지 않고 1로 종료합니다. 방화벽 비활성은 앱 자체가 멈춘 상태와 구분해 경고만 출력합니다. 비활성 검증 후 UFW를 다시 활성화했습니다.
