@@ -298,3 +298,52 @@ Firewall is active and enabled on system startup
 ```
 
 프로세스나 리슨 포트가 없으면 자원 로그를 기록하지 않고 1로 종료합니다. 방화벽 비활성은 앱 자체가 멈춘 상태와 구분해 경고만 출력합니다. 비활성 검증 후 UFW를 다시 활성화했습니다.
+
+## 로그 용량 관리
+
+```bash
+monitor.log 62 bytes
+monitor.log.1 10000000 bytes
+monitor.log.2 10000000 bytes
+monitor.log.3 10000000 bytes
+monitor.log.4 10000000 bytes
+monitor.log.5 10000000 bytes
+monitor.log.6 10000000 bytes
+monitor.log.7 10000000 bytes
+monitor.log.8 10000000 bytes
+monitor.log.9 10000000 bytes
+log files=10
+[2026-09-30 13:00:01] PID:320 CPU:11.9% MEM:3.1% DISK_USED:5%
+```
+
+로그 회전은 flock으로 직렬화합니다. 다음 줄을 더해 10,000,000바이트를 넘으면 현재 파일을 .1로 옮기고 .9를 제거합니다. 현재 파일과 .1부터 .9까지 최대 10개입니다. 위 검사는 AGENT_LOG_DIR을 별도 테스트 디렉토리로 지정하고 truncate로 10MB 파일을 만드는 과정을 12번 반복한 결과입니다. 실제 cron 로그는 이 검사에 사용하지 않았습니다.
+
+## cron 자동 누적
+
+```bash
+Wed Sep 30 13:00:01 UTC 2026
++ date -u
++ wc -l /var/log/agent-app/monitor.log
+3 /var/log/agent-app/monitor.log
++ tail -n 6 /var/log/agent-app/monitor.log
+[2026-09-30 12:57:05] PID:320 CPU:2.0% MEM:3.1% DISK_USED:5%
+[2026-09-30 12:59:02] PID:320 CPU:17.8% MEM:2.4% DISK_USED:5%
+[2026-09-30 12:59:08] PID:320 CPU:20.0% MEM:1.8% DISK_USED:5%
++ tail -n 8 /var/log/agent-app/cron.log
+[OK] PID:320 PORT:15034
+CPU:17.8% MEM:2.4% RSS:195240KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+[OK] PID:320 PORT:15034
++ ufw status
+Status: active
+
+To                         Action      From
+--                         ------      ----
+20022/tcp                  ALLOW       Anywhere                  
+15034/tcp                  ALLOW       Anywhere                  
+20022/tcp (v6)             ALLOW       Anywhere (v6)             
+15034/tcp (v6)             ALLOW       Anywhere (v6)             
+
+```
+
+12:58:02 UTC에 1행이던 monitor.log에 12:59과 13:00의 cron 기록이 추가되었습니다. 임계치 초과 경고는 cron.log에 남으며 모니터는 계속 실행됩니다.
