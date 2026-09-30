@@ -137,3 +137,86 @@ default:other::---
 ```
 
 SSH의 실제 적용값은 sshd -T로 확인했습니다. 비밀번호 대입 공격을 줄이기 위해 기본 포트를 변경하고 Root 직접 로그인을 막습니다. 포트 변경만으로 인증을 대신할 수는 없습니다. 공용 업로드는 agent-common, 키와 로그는 agent-core로 제한합니다. setgid와 기본 ACL은 새 파일에도 공유 그룹과 권한이 이어지도록 적용합니다. 위 출력은 bash -x로 수집한 명령과 결과이며 컨테이너의 시각은 UTC입니다.
+
+## 앱 실행 시 키 경로 오류
+
+```bash
+>>> Starting Agent Boot Sequence...
+[1/5] Checking User Account               [OK]
+   ... Running as service user 'agent-admin' (uid=1001)
+[2/5] Verifying Environment Variables     [FAIL]
+   >>> Key Path Mismatch. Expected: /home/agent-admin/agent-app/api_keys
+[3/5] Checking Required Files             [FAIL]
+   >>> Skipped due to previous critical failure.
+[4/5] Checking Port Availability          [FAIL]
+   >>> Skipped due to previous critical failure.
+[5/5] Verifying Log Permission            [FAIL]
+   >>> Skipped due to previous critical failure.
+--------------------------------------------------
+System Boot Failed. Process Terminated.
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                      
+LISTEN 0      128          0.0.0.0:20022      0.0.0.0:*    users:(("sshd",pid=72,fd=3))
+LISTEN 0      128             [::]:20022         [::]:*    users:(("sshd",pid=72,fd=4))
+ls: cannot open directory '/home/agent-admin/agent-app/api_keys': Permission denied
+ls: cannot open directory '/var/log/agent-app': Permission denied
+```
+
+명세의 파일 경로를 AGENT_KEY_PATH에 지정했으나 바이너리는 api_keys 디렉토리를 요구했습니다. 환경변수 검사에서 중단되어 아직 앱 포트가 열리지 않았습니다. QA 계정은 upload_files에 파일을 만들 수 있고, 키와 로그 목록 조회는 거부됩니다.
+
+## 키 파일명 확인
+
+```bash
+>>> Starting Agent Boot Sequence...
+[1/5] Checking User Account               [OK]
+   ... Running as service user 'agent-admin' (uid=1001)
+[2/5] Verifying Environment Variables     [OK]
+   ... All required Envs correct
+[3/5] Checking Required Files             [FAIL]
+   >>> Missing File: secret.key
+   >>>    (Expected location: /home/agent-admin/agent-app/api_keys/secret.key)
+[4/5] Checking Port Availability          [FAIL]
+   >>> Skipped due to previous critical failure.
+[5/5] Verifying Log Permission            [FAIL]
+   >>> Skipped due to previous critical failure.
+--------------------------------------------------
+System Boot Failed. Process Terminated.
+```
+
+경로를 디렉토리로 수정한 뒤에는 secret.key 파일명을 요구했습니다. 명세에 나온 t_secret.key와 함께 같은 테스트 문자열의 secret.key를 생성했습니다.
+
+## 앱 부트와 포트
+
+```bash
+>>> Starting Agent Boot Sequence...
+[1/5] Checking User Account               [OK]
+   ... Running as service user 'agent-admin' (uid=1001)
+[2/5] Verifying Environment Variables     [OK]
+   ... All required Envs correct
+[3/5] Checking Required Files             [OK]
+   ... Verified 'secret.key' with correct key string.
+[4/5] Checking Port Availability          [OK]
+   ... Port 15034 is available.
+[5/5] Verifying Log Permission            [OK]
+   ... Log directory is writable: /var/log/agent-app
+------------------------------------------------------------
+All Boot Checks Passed!
+Agent READY
+2026-09-30 12:55:57,969 [INFO] [SafetyGuard] Process priority lowered (nice=10).
+2026-09-30 12:55:57,969 [INFO] Agent listening at port 15034
+2026-09-30 12:55:57,969 [INFO] === Agent Worker Started ===
+2026-09-30 12:55:57,969 [INFO]    > Cycle: 0 -> 256MB/Lv10 -> 0
+2026-09-30 12:55:57,969 [INFO] --- Step Info: Mode=UP, CPU Lv=1, Mem=0MB ---
+2026-09-30 12:55:57,971 [INFO] [Memory] Increasing... (+25 MB) Total: 25 MB
+2026-09-30 12:55:57,971 [INFO] [CPU] Occupy core for 1s (Level 1)
+2026-09-30 12:55:59,977 [INFO] --- Step Info: Mode=UP, CPU Lv=2, Mem=25MB ---
+2026-09-30 12:55:59,992 [INFO] [Memory] Increasing... (+25 MB) Total: 50 MB
+2026-09-30 12:55:59,992 [INFO] [CPU] Occupy core for 2s (Level 2)
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                      
+LISTEN 0      128          0.0.0.0:20022      0.0.0.0:*    users:(("sshd",pid=72,fd=3))
+LISTEN 0      1            0.0.0.0:15034      0.0.0.0:*                                
+LISTEN 0      128             [::]:20022         [::]:*    users:(("sshd",pid=72,fd=4))
+  314     0 agent-a+ agent-app-linux /home/agent-admin/agent-app/agent-app-linux-arm64
+  320   314 agent-a+ agent-app-linux /home/agent-admin/agent-app/agent-app-linux-arm64
+```
+
+AGENT_KEY_PATH는 api_keys 디렉토리, 키 파일명은 secret.key로 실행했습니다. 제공 바이너리는 같은 경로로 부모와 자식 프로세스를 생성합니다. 리슨 소켓을 가진 자식 프로세스를 모니터링 대상으로 선택합니다.
