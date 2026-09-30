@@ -346,4 +346,54 @@ To                         Action      From
 
 ```
 
-12:58:02 UTC에 1행이던 monitor.log에 12:59과 13:00의 cron 기록이 추가되었습니다. 임계치 초과 경고는 cron.log에 남으며 모니터는 계속 실행됩니다.
+12:58:02 UTC에 1행이던 monitor.log에 12:59의 cron 기록이 추가되었습니다. 13:00:01 조회 시 해당 분의 샘플은 진행 중이었습니다. 임계치 초과 경고는 cron.log에 남으며 모니터는 계속 실행됩니다.
+
+## 점검과 실행 방법
+
+- [x] SSH 포트 변경(20022) 및 Root 원격 접속 차단 설정 확인 내역
+- [x] 방화벽(UFW 또는 firewalld) 활성화 및 20022/tcp, 15034/tcp만 허용 내역
+- [x] 계정/그룹(agent-admin/dev/test, agent-common/core) 생성 확인 내역
+- [x] 디렉토리 구조 및 권한(ACL 포함) 확인 내역
+- [x] 앱 Boot Sequence 5단계 [OK] 및 "Agent READY" 확인 내역
+- [x] monitor.sh 실행 결과(프로세스/포트/리소스/경고) 내역
+- [x] /var/log/agent-app/monitor.log 누적 기록 확인(최근 라인) 내역
+- [x] crontab 매분 실행 등록 및 자동 실행 확인(1분 후 로그 증가) 내역
+
+Ubuntu 환경에 openssh-server, ufw, acl, cron, sudo, procps, iproute2 패키지를 설치합니다. 위 명령으로 계정과 경로를 구성한 뒤 제공 arm64 바이너리를 `$AGENT_HOME/agent-app-linux-arm64`에 배치합니다. x86 환경에서는 해당 아키텍처의 바이너리 경로를 AGENT_APP으로 지정합니다. monitor.sh는 `$AGENT_HOME/bin`에 복사하고 agent-dev:agent-core, 750을 적용합니다.
+
+실제 바이너리의 환경변수 설정은 다음과 같습니다.
+
+```bash
+export AGENT_HOME=/home/agent-admin/agent-app
+export AGENT_PORT=15034
+export AGENT_UPLOAD_DIR=$AGENT_HOME/upload_files
+export AGENT_KEY_PATH=$AGENT_HOME/api_keys
+export AGENT_LOG_DIR=/var/log/agent-app
+```
+
+일반 계정에서 앱을 실행한 뒤 다른 터미널에서 monitor.sh를 실행합니다. cron에는 위 설정을 담은 agent.env를 source하는 명령을 등록합니다. 모니터의 상태 경고는 방화벽이나 자원 여유가 줄었음을 뜻하며, 앱 중단을 의미하지 않습니다. CPU 20%, MEM 10%, 디스크 80% 초과 조건을 각각 비교합니다.
+
+## 운영 시 확인 순서
+
+웹 서버로 대상을 바꾸면 AGENT_APP과 AGENT_PORT를 해당 실행 경로와 포트로 맞추고 로그 위치와 임계값을 서비스에 맞게 조정합니다. 프로세스가 있으나 포트가 없으면 부트 로그, 환경변수, ss의 리슨 주소와 포트, 포트 충돌을 확인합니다. 프로세스의 존재만으로 서비스가 준비되었다고 판단하지 않습니다.
+
+디스크가 부족하면 먼저 어떤 로그가 증가했는지와 남은 공간을 확인하고, 필요한 장애 기록을 별도로 보존한 뒤 오래된 회전 파일을 정리합니다. 이후 발생 원인, 기록 빈도, 보존 기간을 조정합니다. 10MB/10개 정책은 monitor.log 계열에 적용하며 app.log와 cron.log는 별도로 관리해야 합니다.
+
+## cron 샘플 완료 확인
+
+```bash
+Wed Sep 30 13:00:53 UTC 2026
+4 /var/log/agent-app/monitor.log
+[2026-09-30 12:57:05] PID:320 CPU:2.0% MEM:3.1% DISK_USED:5%
+[2026-09-30 12:59:02] PID:320 CPU:17.8% MEM:2.4% DISK_USED:5%
+[2026-09-30 12:59:08] PID:320 CPU:20.0% MEM:1.8% DISK_USED:5%
+[2026-09-30 13:00:02] PID:320 CPU:13.0% MEM:3.1% DISK_USED:5%
+[OK] PID:320 PORT:15034
+CPU:17.8% MEM:2.4% RSS:195240KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+[OK] PID:320 PORT:15034
+CPU:13.0% MEM:3.1% RSS:246260KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+```
+
+앞선 13:00:01 조회는 해당 분의 샘플이 기록되기 전이었습니다. 위 조회에서 새 시각의 로그가 실제로 추가된 것을 확인했습니다.
