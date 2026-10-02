@@ -397,3 +397,143 @@ CPU:13.0% MEM:3.1% RSS:246260KiB DISK_USED:5%
 ```
 
 앞선 13:00:01 조회는 해당 분의 샘플이 기록되기 전이었습니다. 위 조회에서 새 시각의 로그가 실제로 추가된 것을 확인했습니다.
+
+## 보너스: 실제 로그 통계
+
+```bash
+>>> Starting Agent Boot Sequence...
+[1/5] Checking User Account               [OK]
+   ... Running as service user 'agent-admin' (uid=1001)
+[2/5] Verifying Environment Variables     [OK]
+   ... All required Envs correct
+[3/5] Checking Required Files             [OK]
+   ... Verified 'secret.key' with correct key string.
+[4/5] Checking Port Availability          [OK]
+   ... Port 15034 is available.
+[5/5] Verifying Log Permission            [OK]
+   ... Log directory is writable: /var/log/agent-app
+------------------------------------------------------------
+All Boot Checks Passed!
+Agent READY
+2026-10-02 13:09:31,759 [INFO] [SafetyGuard] Process priority lowered (nice=10).
+2026-10-02 13:09:31,759 [INFO] Agent listening at port 15034
+2026-10-02 13:09:31,759 [INFO] === Agent Worker Started ===
+2026-10-02 13:09:31,759 [INFO]    > Cycle: 0 -> 256MB/Lv10 -> 0
+2026-10-02 13:09:31,759 [INFO] --- Step Info: Mode=UP, CPU Lv=1, Mem=0MB ---
+2026-10-02 13:09:31,770 [INFO] [Memory] Increasing... (+25 MB) Total: 25 MB
+2026-10-02 13:09:31,770 [INFO] [CPU] Occupy core for 1s (Level 1)
+2026-10-02 13:09:33,777 [INFO] --- Step Info: Mode=UP, CPU Lv=2, Mem=25MB ---
+2026-10-02 13:09:33,814 [INFO] [Memory] Increasing... (+25 MB) Total: 50 MB
+2026-10-02 13:09:33,814 [INFO] [CPU] Occupy core for 2s (Level 2)
+[OK] PID:263 PORT:15034
+CPU:14.9% MEM:0.8% RSS:67648KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+[OK] PID:263 PORT:15034
+CPU:2.9% MEM:1.2% RSS:93256KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+[OK] PID:263 PORT:15034
+CPU:15.8% MEM:1.2% RSS:93256KiB DISK_USED:5%
+[INFO] Log appended: /var/log/agent-app/monitor.log
+[2026-10-02 13:09:35] PID:263 CPU:14.9% MEM:0.8% DISK_USED:5%
+[2026-10-02 13:09:36] PID:263 CPU:2.9% MEM:1.2% DISK_USED:5%
+[2026-10-02 13:09:38] PID:263 CPU:15.8% MEM:1.2% DISK_USED:5%
+====== STATISTICS REPORT ======
+[CPU]
+Average: 11.20%
+Maximum: 15.80% at 2026-10-02 13:09:38
+Minimum: 2.90% at 2026-10-02 13:09:36
+[MEM]
+Average: 1.07%
+Maximum: 1.20% at 2026-10-02 13:09:36
+Minimum: 0.80% at 2026-10-02 13:09:35
+[DISK]
+Average: 5.00%
+Maximum: 5.00% at 2026-10-02 13:09:35
+Minimum: 5.00% at 2026-10-02 13:09:35
+[Samples]
+Data Points: 3 samples
+```
+
+Ubuntu 24.04의 새 전용 컨테이너에서 제공 바이너리를 실행해 모니터 로그 3개를 수집했습니다. report.sh는 CPU/MEM/DISK 평균과 최댓값/최솟값 및 그 시각, 표본 수를 출력합니다. 동일한 값이 반복되면 처음 관측한 시각을 유지합니다. CPU 11.20%, MEM 1.07%, DISK 5.00%의 평균을 얻었습니다. 파일과 시작/종료 시각을 인자로 지정할 수 있고 양 끝 시각을 포함합니다.
+
+## 보너스: 로그 보존과 오류 조건
+
+```bash
+Controlled samples: 10/20/30 CPU, 2/4/6 MEM, 30/40/50 DISK
+[WARNING] Malformed lines skipped: 1
+====== STATISTICS REPORT ======
+[CPU]
+Average: 20.00%
+Maximum: 30.00% at 2026-10-02 12:02:00
+Minimum: 10.00% at 2026-10-02 12:00:00
+[MEM]
+Average: 4.00%
+Maximum: 6.00% at 2026-10-02 12:02:00
+Minimum: 2.00% at 2026-10-02 12:00:00
+[DISK]
+Average: 40.00%
+Maximum: 50.00% at 2026-10-02 12:02:00
+Minimum: 30.00% at 2026-10-02 12:00:00
+[Samples]
+Data Points: 3 samples
+[WARNING] Malformed lines skipped: 1
+====== STATISTICS REPORT ======
+[CPU]
+Average: 20.00%
+Maximum: 20.00% at 2026-10-02 12:01:00
+Minimum: 20.00% at 2026-10-02 12:01:00
+[MEM]
+Average: 4.00%
+Maximum: 4.00% at 2026-10-02 12:01:00
+Minimum: 4.00% at 2026-10-02 12:01:00
+[DISK]
+Average: 40.00%
+Maximum: 40.00% at 2026-10-02 12:01:00
+Minimum: 40.00% at 2026-10-02 12:01:00
+[Samples]
+Data Points: 1 samples
+[INFO] No samples in the requested range
+[WARNING] Malformed lines skipped: 1
+expected=2 actual=2
+[ERROR] Log is missing or unreadable: /tmp/tmp.ZK1lGbsKdD/missing.log
+expected=1 actual=1
+[ERROR] Start time is after end time
+expected=1 actual=1
+Controlled file ages: 6/8/29/30 days; not historical production records
+[ARCHIVED] /tmp/tmp.ZK1lGbsKdD/logs/eight-days.log -> /tmp/tmp.ZK1lGbsKdD/archive/eight-days.log.gz
+[ARCHIVED] /tmp/tmp.ZK1lGbsKdD/logs/thirty-days.log -> /tmp/tmp.ZK1lGbsKdD/archive/thirty-days.log.gz
+[DELETED] /tmp/tmp.ZK1lGbsKdD/archive/thirty-days.log.gz
+[DELETED] /tmp/tmp.ZK1lGbsKdD/archive/thirty-days.gz
+[INFO] Archived: 2 Deleted: 2
+keep old source
+[INFO] Archived: 0 Deleted: 0
+[WARNING] Skip unreadable file or archive collision: /tmp/tmp.ZK1lGbsKdD/logs/collision.log
+[INFO] Archived: 0 Deleted: 0
+expected=1 actual=1
+[ERROR] Log directory is missing or inaccessible: /tmp/tmp.ZK1lGbsKdD/missing
+expected=1 actual=1
+[ERROR] Log directory is missing or inaccessible: /tmp/tmp.ZK1lGbsKdD/denied
+expected=1 actual=1
+[PASS] statistics, range, age policy, roundtrip, repeat, collision, missing and permission cases
+```
+
+archive.sh는 기본 /var/log/agent-app/*.log에서 mtime이 7일 이상인 일반 파일만 압축하여 /var/log/monitor/agent-app/archive로 옮깁니다. gzip 파일은 원본 mtime을 보존하고 30일 이상이면 삭제합니다. 아래 날짜와 수치는 경계 검사를 위한 통제 파일이며 실제 과거 운영 로그가 아닙니다. 6일 파일 유지, 8일 파일 압축 후 내용 복원, 29일 아카이브 유지, 30일 원본/아카이브 삭제를 확인했습니다. 심볼릭 링크는 건드리지 않고, 기존 아카이브와 이름이 충돌하거나 압축에 실패하면 원본을 보존하며 실패 상태로 종료합니다. 같은 디렉토리의 중복 실행과 monitor.sh 기록/회전은 flock으로 잠급니다. 파일 경과일은 생성 시각이 아니라 수정 시각 기준입니다. 대상 0개는 성공, 잘못된 경로/권한은 오류입니다. 리포트의 표본 0개는 종료 코드 2이며 형식 오류 행은 경고 후 제외합니다.
+
+## 보너스 자동 실행 등록
+
+```bash
+15 2 * * * /home/agent-admin/agent-app/bin/archive.sh
+30 2 * * * /home/agent-admin/agent-app/bin/report.sh > /var/log/agent-app/report.txt
+```
+
+전용 컨테이너의 agent-admin에 매일 02:15 보존 정책, 02:30 리포트를 등록했습니다. 이 시각의 자동 실행까지 기다렸다는 의미는 아닙니다. 스크립트 실행 자체와 cron 등록을 따로 확인했으며 실습 컨테이너는 증거 저장 후 삭제합니다. 기존 필수 매분 monitor cron 실행 증거는 앞의 수행 기록에 있습니다.
+
+## 보너스 실행 방법
+
+```bash
+./report.sh /var/log/agent-app/monitor.log '2026-10-02 00:00:00' '2026-10-02 23:59:59'
+./archive.sh
+bash tests/bonus.sh
+```
+
+Bash와 GNU awk/find/date/stat, gzip, flock을 사용하는 Linux에서 실행합니다. 기본 아카이브 경로는 운영자가 agent-admin이 쓸 수 있게 미리 만들고 agent-core 그룹 권한을 설정합니다. 날짜 범위와 각 파일의 mtime은 실행 환경의 동일한 시간대를 사용합니다.
